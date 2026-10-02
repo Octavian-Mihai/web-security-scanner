@@ -8,7 +8,9 @@ from .models import Rule, Severity
 A01 = "A01:2021 Broken Access Control"
 A02 = "A02:2021 Cryptographic Failures"
 A03 = "A03:2021 Injection"
+A04 = "A04:2021 Insecure Design"
 A05 = "A05:2021 Security Misconfiguration"
+A08 = "A08:2021 Software and Data Integrity Failures"
 
 _RULES = [
     # --- security headers -------------------------------------------------
@@ -83,6 +85,12 @@ _RULES = [
          "A cookie has no SameSite attribute (or SameSite=None), weakening CSRF defences.",
          "Add SameSite=Lax (or Strict) unless cross-site use is required.",
          1275, A01),
+    Rule("WSS023", "Invalid cookie name prefix usage", Severity.LOW,
+         "A cookie uses the __Secure- or __Host- prefix without meeting its requirements "
+         "(Secure; for __Host- also Path=/ and no Domain). Browsers reject such cookies, "
+         "silently dropping the protection the prefix was meant to give.",
+         "Set Secure (and Path=/, no Domain for __Host-) on prefixed cookies.",
+         1275, A05),
     # --- transport --------------------------------------------------------
     Rule("WSS030", "Site served over plain HTTP", Severity.HIGH,
          "The target is reachable only over unencrypted HTTP, exposing all traffic, "
@@ -112,6 +120,20 @@ _RULES = [
          "hostname mismatch), enabling man-in-the-middle attacks.",
          "Install a certificate from a trusted CA that matches the hostname.",
          295, A02),
+    Rule("WSS036", "Weak certificate key", Severity.HIGH,
+         "The certificate uses an RSA key shorter than 2048 bits or an elliptic-curve key "
+         "shorter than 224 bits, which can be factored or broken with feasible resources.",
+         "Reissue the certificate with RSA >= 2048 bits or an EC P-256 key.",
+         326, A02),
+    Rule("WSS037", "Weak certificate signature algorithm", Severity.MEDIUM,
+         "The certificate is signed with SHA-1 or MD5, which are vulnerable to collisions.",
+         "Reissue the certificate signed with SHA-256 or stronger.",
+         328, A02),
+    Rule("WSS038", "Loopback target served over plain HTTP", Severity.LOW,
+         "A localhost/loopback target is served over plain HTTP. This is normal for local "
+         "development, so it is reported as low rather than as WSS030.",
+         "Ignore for local targets, or serve over HTTPS if the service is later exposed.",
+         319, A02),
     # --- exposure ---------------------------------------------------------
     Rule("WSS040", "Exposed version-control metadata", Severity.HIGH,
          "Repository metadata (e.g. /.git/) is publicly readable, which can leak "
@@ -126,6 +148,37 @@ _RULES = [
          "A directory index is served, exposing file names and potentially sensitive files.",
          "Disable automatic directory listing on the web server.",
          548, A05),
+    Rule("WSS043", "JavaScript source map exposed", Severity.LOW,
+         "A source map is publicly served, exposing original source code, comments and "
+         "internal file layout to anyone.",
+         "Do not deploy source maps to production, or restrict them to authenticated users.",
+         540, A05),
+    Rule("WSS044", "Exposed debug or management endpoint", Severity.MEDIUM,
+         "A diagnostics endpoint (e.g. Actuator, server-status, Prometheus metrics, phpinfo) "
+         "is publicly readable and reveals configuration or runtime internals.",
+         "Restrict management endpoints to internal networks or require authentication.",
+         200, A05),
+    # --- page content -----------------------------------------------------
+    Rule("WSS050", "Third-party resource without Subresource Integrity", Severity.LOW,
+         "A script or stylesheet is loaded from another origin without an integrity "
+         "attribute, so a compromise of that origin runs attacker code on this site.",
+         "Add integrity=\"sha384-...\" and crossorigin=\"anonymous\", or self-host the file.",
+         353, A08),
+    Rule("WSS051", "Mixed content on HTTPS page", Severity.MEDIUM,
+         "An HTTPS page loads a resource over plain HTTP, which can be read or tampered "
+         "with in transit and may be blocked by browsers.",
+         "Load every subresource over HTTPS.",
+         319, A02),
+    Rule("WSS052", "No security.txt", Severity.INFO,
+         "The site publishes no /.well-known/security.txt (RFC 9116), so researchers have "
+         "no documented channel for reporting vulnerabilities.",
+         "Publish /.well-known/security.txt with at least a Contact field.",
+         1059, A05),
+    Rule("WSS053", "JWT exposed in URL", Severity.MEDIUM,
+         "A JSON Web Token appears in a URL (page address, redirect target or link), where "
+         "it leaks into logs, browser history and Referer headers.",
+         "Send tokens in the Authorization header or an HttpOnly cookie, never in the URL.",
+         598, A04),
 ]
 
 RULES: dict[str, Rule] = {r.id: r for r in _RULES}

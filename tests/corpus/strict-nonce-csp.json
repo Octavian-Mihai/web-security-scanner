@@ -1,0 +1,31 @@
+{
+  "name": "strict-nonce-csp",
+  "description": "Nonce + strict-dynamic CSP, no unsafe-*, HSTS preload",
+  "https": true,
+  "routes": {
+    "*": {
+      "status": 200,
+      "headers": {
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "X-Content-Type-Options": "nosniff",
+        "Permissions-Policy": "geolocation=()",
+        "Content-Security-Policy": "default-src 'none'; script-src 'nonce-r4nd0m' 'strict-dynamic'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+        "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+        "Server": "cloudflare"
+      },
+      "body": "<html><script nonce='r4nd0m' src='/app.js'></script><a href='/about'>about</a></html>"
+    },
+    "/.well-known/security.txt": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "text/plain"
+      },
+      "body": "Contact: mailto:security@example.com\nExpires: 2027-01-01T00:00:00Z\n"
+    }
+  },
+  "groups": [
+    "headers",
+    "content"
+  ],
+  "expect": []
+}

@@ -4,11 +4,11 @@ from conftest import HARDENED
 from websec.checks import CHECKS
 from websec.checks.cookies import parse_set_cookie
 from websec.checks.headers import csp_weaknesses, parse_csp
-from websec.scanner import scan
+from websec.scanner import ScanOptions, scan
 
 
 def rule_ids(site_url, groups, **kw):
-    result = scan(site_url, {g: CHECKS[g] for g in groups}, **kw)
+    result = scan(site_url, {g: CHECKS[g] for g in groups}, ScanOptions(**kw))
     return {f.rule.id for f in result.findings}, result
 
 
@@ -91,7 +91,8 @@ def test_cors_reflection_with_credentials_is_high(site):
 def test_exposure_validates_content_not_status(site):
     # SPA-style catch-all: 200 + HTML for everything must NOT produce findings.
     site.routes["*"] = (200, [], "<html><body>app</body></html>")
-    assert rule_ids(site.url, ["exposure"])[0] == set()
+    # Only WSS052: the HTML catch-all must not be mistaken for a real security.txt.
+    assert rule_ids(site.url, ["exposure"])[0] == {"WSS052"}
 
 
 def test_exposure_detects_real_leaks(site):
@@ -100,7 +101,7 @@ def test_exposure_detects_real_leaks(site):
     site.routes["/ftp/"] = (200, [], "<html><head><title>listing directory /ftp</title>")
     site.routes["*"] = (200, [], "<html>app</html>")
     ids, result = rule_ids(site.url, ["exposure"])
-    assert ids == {"WSS040", "WSS041", "WSS042"}
+    assert ids == {"WSS040", "WSS041", "WSS042", "WSS052"}
     assert all("hunter2" not in f.evidence for f in result.findings)  # never echo secrets
 
 
@@ -110,7 +111,15 @@ def test_ignore_suppresses_rule(site):
     assert "WSS001" not in ids and "WSS005" in ids
 
 
-def test_plain_http_target_flagged(site):
+def test_plain_http_loopback_is_low_not_high(site):
     site.routes["*"] = (200, HARDENED, "")
-    # A URL with an explicit non-443 port has no discoverable HTTPS endpoint.
+    # An explicit non-443 port has no discoverable HTTPS endpoint; loopback => WSS038.
+    ids, result = rule_ids(site.url, ["tls"])
+    assert ids == {"WSS038"}
+    assert result.findings[0].severity.label == "low"
+
+
+def test_plain_http_non_loopback_is_high(site, monkeypatch):
+    site.routes["*"] = (200, HARDENED, "")
+    monkeypatch.setattr("websec.checks.tls.is_loopback", lambda host: False)
     assert rule_ids(site.url, ["tls"])[0] == {"WSS030"}

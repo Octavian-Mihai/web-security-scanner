@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a vulnerability in websec-scanner
+    url: https://github.com/Octavian-Mihai/web-security-scanner/security/advisories/new
+    about: Please use private reporting, not a public issue.

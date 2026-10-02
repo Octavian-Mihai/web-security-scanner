@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass, field
 from enum import IntEnum
+from typing import Any
 
 
 class Severity(IntEnum):
@@ -58,7 +59,8 @@ class Finding:
     evidence: str = ""
     # Disambiguates multiple findings of one rule on one URL (e.g. one per cookie).
     key: str = ""
-    extra: dict = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
+    is_new: bool | None = None  # set when compared against a previous scan
 
     @property
     def severity(self) -> Severity:

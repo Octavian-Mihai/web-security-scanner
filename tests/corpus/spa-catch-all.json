@@ -1,0 +1,25 @@
+{
+  "name": "spa-catch-all",
+  "description": "SPA returns index.html with 200 for every path",
+  "https": false,
+  "routes": {
+    "*": {
+      "status": 200,
+      "headers": {
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "X-Content-Type-Options": "nosniff",
+        "Permissions-Policy": "geolocation=()",
+        "Content-Security-Policy": "default-src 'self'; frame-ancestors 'self'"
+      },
+      "body": "<!doctype html><html><body><div id='root'></div><script src='/main.js'></script></body></html>"
+    }
+  },
+  "groups": [
+    "headers",
+    "exposure",
+    "content"
+  ],
+  "expect": [
+    "WSS052"
+  ]
+}

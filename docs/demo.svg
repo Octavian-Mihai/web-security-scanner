@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="484" viewBox="0 0 800 484" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14">
+<rect width="800" height="484" rx="8" fill="#0d1117"/>
+<circle cx="20" cy="18" r="6" fill="#ff5f56"/><circle cx="40" cy="18" r="6" fill="#ffbd2e"/><circle cx="60" cy="18" r="6" fill="#27c93f"/>
+<text x="18" y="56" fill="#7ee787" xml:space="preserve">$ websec scan http://localhost:3000</text>
+<text x="18" y="76" xml:space="preserve"><tspan fill="#d29922" font-weight="bold">MEDIUM  </tspan><tspan fill="#e6edf3"> WSS001  Missing Content-Security-Policy</tspan></text>
+<text x="18" y="96" fill="#8b949e" xml:space="preserve">         No Content-Security-Policy header.</text>
+<text x="18" y="116" fill="#8b949e" xml:space="preserve">         CWE-693 | OWASP A05:2021 Security Misconfiguration | http://localhost:3000/</text>
+<text x="18" y="136" xml:space="preserve"><tspan fill="#d29922" font-weight="bold">MEDIUM  </tspan><tspan fill="#e6edf3"> WSS010  Wildcard CORS policy</tspan></text>
+<text x="18" y="156" fill="#8b949e" xml:space="preserve">         Access-Control-Allow-Origin is &#x27;*&#x27;; any site can read this response.</text>
+<text x="18" y="176" fill="#8b949e" xml:space="preserve">         CWE-942 | OWASP A05:2021 Security Misconfiguration | http://localhost:3000/</text>
+<text x="18" y="196" xml:space="preserve"><tspan fill="#d29922" font-weight="bold">MEDIUM  </tspan><tspan fill="#e6edf3"> WSS042  Directory listing enabled</tspan></text>
+<text x="18" y="216" fill="#8b949e" xml:space="preserve">         Directory listing is enabled at /ftp/</text>
+<text x="18" y="236" fill="#8b949e" xml:space="preserve">         CWE-548 | OWASP A05:2021 Security Misconfiguration | http://localhost:3000/ftp/</text>
+<text x="18" y="256" xml:space="preserve"><tspan fill="#d29922" font-weight="bold">MEDIUM  </tspan><tspan fill="#e6edf3"> WSS044  Exposed debug or management endpoint</tspan></text>
+<text x="18" y="276" fill="#8b949e" xml:space="preserve">         Prometheus /metrics is publicly readable.</text>
+<text x="18" y="296" fill="#8b949e" xml:space="preserve">         CWE-200 | OWASP A05:2021 Security Misconfiguration | http://localhost:3000/metrics</text>
+<text x="18" y="316" xml:space="preserve"><tspan fill="#58a6ff" font-weight="bold">LOW     </tspan><tspan fill="#e6edf3"> WSS007  Missing Referrer-Policy</tspan></text>
+<text x="18" y="336" fill="#8b949e" xml:space="preserve">         No Referrer-Policy header.</text>
+<text x="18" y="356" fill="#8b949e" xml:space="preserve">         CWE-200 | OWASP A05:2021 Security Misconfiguration | http://localhost:3000/</text>
+<text x="18" y="376" xml:space="preserve"><tspan fill="#58a6ff" font-weight="bold">LOW     </tspan><tspan fill="#e6edf3"> WSS038  Loopback target served over plain HTTP</tspan></text>
+<text x="18" y="396" fill="#8b949e" xml:space="preserve">         Loopback target is served over plain HTTP.</text>
+<text x="18" y="416" fill="#8b949e" xml:space="preserve">         CWE-319 | OWASP A02:2021 Cryptographic Failures | http://localhost:3000</text>
+<text x="18" y="436" fill="#e6edf3" xml:space="preserve"></text>
+<text x="18" y="456" fill="#e6edf3" xml:space="preserve">6 finding(s): 4 medium, 2 low</text>
+</svg>

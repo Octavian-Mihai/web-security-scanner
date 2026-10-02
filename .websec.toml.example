@@ -1,0 +1,7 @@
+# Copy to .websec.toml (auto-discovered in the working directory) or pass --config.
+# Every entry needs a reason. Expired entries stop applying and are reported.
+[[ignore]]
+rule    = "WSS008"                          # required: a rule id (see `websec rules`)
+reason  = "Permissions-Policy tracked in SEC-123"   # required
+url     = "https://staging.example.com/*"   # optional glob, default "*"
+expires = 2027-03-01                        # optional TOML date

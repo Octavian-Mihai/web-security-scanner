@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from .. import rules
 from ..models import Finding
@@ -38,9 +39,11 @@ def parse_set_cookie(header: str) -> Cookie | None:
     return cookie
 
 
-def _set_cookie_headers(resp) -> list[str]:
+def _set_cookie_headers(resp: Any) -> list[str]:
     # requests folds repeated headers into one string; urllib3 keeps them separate.
-    return resp.raw.headers.getlist("Set-Cookie") if hasattr(resp.raw, "headers") else []
+    if not hasattr(resp.raw, "headers"):
+        return []
+    return list(resp.raw.headers.getlist("Set-Cookie"))
 
 
 def check_cookies(ctx: ScanContext) -> list[Finding]:
@@ -61,6 +64,19 @@ def check_cookies(ctx: ScanContext) -> list[Finding]:
             if not cookie.httponly:
                 out.append(Finding(rules.get("WSS021"), resp.url,
                                    f"Cookie '{name}' is set without the HttpOnly flag.",
+                                   evidence=evidence, key=name))
+            lowered = name.lower()
+            if lowered.startswith("__host-") and not (
+                    cookie.secure and cookie.attrs.get("path") == "/"
+                    and "domain" not in cookie.attrs):
+                out.append(Finding(rules.get("WSS023"), resp.url,
+                                   f"Cookie '{name}' uses __Host- but is not Secure, "
+                                   "Path=/ and Domain-less; browsers will reject it.",
+                                   evidence=evidence, key=name))
+            elif lowered.startswith("__secure-") and not cookie.secure:
+                out.append(Finding(rules.get("WSS023"), resp.url,
+                                   f"Cookie '{name}' uses __Secure- but lacks the Secure flag; "
+                                   "browsers will reject it.",
                                    evidence=evidence, key=name))
             if (cookie.samesite or "none").lower() == "none":
                 out.append(Finding(rules.get("WSS022"), resp.url,

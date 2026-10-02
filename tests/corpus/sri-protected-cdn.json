@@ -1,0 +1,23 @@
+{
+  "name": "sri-protected-cdn",
+  "description": "Third-party assets all carry integrity attributes",
+  "https": true,
+  "routes": {
+    "*": {
+      "status": 200,
+      "headers": {
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "X-Content-Type-Options": "nosniff",
+        "Permissions-Policy": "geolocation=()",
+        "Content-Security-Policy": "default-src 'self'; script-src 'self' https://cdn.example.net; frame-ancestors 'self'",
+        "Strict-Transport-Security": "max-age=31536000"
+      },
+      "body": "<html><script src='https://cdn.example.net/x.js' integrity='sha384-AAAA' crossorigin='anonymous'></script><link rel='stylesheet' href='https://cdn.example.net/x.css' integrity='sha384-BBBB' crossorigin='anonymous'><link rel='canonical' href='http://www.example.com/'></html>"
+    }
+  },
+  "groups": [
+    "headers",
+    "content"
+  ],
+  "expect": []
+}

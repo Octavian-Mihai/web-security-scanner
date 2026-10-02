@@ -54,15 +54,14 @@ def test_severity_parse():
 def test_cli_exit_codes_and_sarif(site, tmp_path, capsys):
     site.routes["*"] = (200, [], "")
     out = tmp_path / "r" / "out.sarif"
-    # Plain HTTP => WSS030 (high) => build fails at default threshold.
-    assert main(["scan", site.url, "--sarif", str(out), "--checks", "tls"]) == 1
-    assert json.loads(out.read_text())["runs"][0]["results"][0]["ruleId"] == "WSS030"
-    # Same scan, gate raised to critical => passes.
-    assert main(["scan", site.url, "--checks", "tls", "--fail-on", "critical"]) == 0
-    # Gate disabled.
+    # Loopback plain HTTP => WSS038 (low) => trips a "low" gate, not the default "high" one.
+    assert main(["scan", site.url, "--sarif", str(out), "--checks", "tls",
+                 "--fail-on", "low"]) == 1
+    assert json.loads(out.read_text())["runs"][0]["results"][0]["ruleId"] == "WSS038"
+    assert main(["scan", site.url, "--checks", "tls"]) == 0
     assert main(["scan", site.url, "--checks", "tls", "--fail-on", "none"]) == 0
-    # Suppressed rule.
-    assert main(["scan", site.url, "--checks", "tls", "--ignore", "WSS030"]) == 0
+    assert main(["scan", site.url, "--checks", "tls", "--fail-on", "low",
+                 "--ignore", "WSS038"]) == 0
 
 
 def test_cli_unreachable_target_is_error_not_pass(tmp_path):
@@ -83,7 +82,7 @@ def test_github_outputs_written(site, tmp_path, monkeypatch):
     gh_out, gh_sum = tmp_path / "out", tmp_path / "sum"
     monkeypatch.setenv("GITHUB_OUTPUT", str(gh_out))
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(gh_sum))
-    main(["scan", site.url, "--checks", "tls"])
+    main(["scan", site.url, "--checks", "tls", "--fail-on", "low"])
     text = gh_out.read_text()
-    assert "findings=1" in text and "highest-severity=high" in text and "failed=true" in text
-    assert "WSS030" in gh_sum.read_text()
+    assert "findings=1" in text and "highest-severity=low" in text and "failed=true" in text
+    assert "WSS038" in gh_sum.read_text()

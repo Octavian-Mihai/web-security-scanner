@@ -1,0 +1,23 @@
+{
+  "name": "legacy-but-safe-frame-protection",
+  "description": "X-Frame-Options instead of frame-ancestors; report-only extras",
+  "https": false,
+  "routes": {
+    "*": {
+      "status": 200,
+      "headers": {
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "X-Content-Type-Options": "nosniff",
+        "Permissions-Policy": "geolocation=()",
+        "Content-Security-Policy": "default-src 'self'",
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy-Report-Only": "default-src 'self'; report-uri /csp"
+      },
+      "body": "<html></html>"
+    }
+  },
+  "groups": [
+    "headers"
+  ],
+  "expect": []
+}

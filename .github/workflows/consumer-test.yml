@@ -1,0 +1,32 @@
+name: Consumer test
+
+# Proves the Action works for an *outside* repository: no checkout, no workspace files, the
+# Action is resolved from its published ref exactly as a user's workflow would resolve it.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  consume:
+    runs-on: ubuntu-latest
+    services:
+      juice-shop:
+        image: bkimminich/juice-shop:latest
+        ports: ["3000:3000"]
+    steps:
+      - name: Wait for Juice Shop
+        run: |
+          for i in $(seq 1 60); do curl -sf http://localhost:3000/ >/dev/null && exit 0; sleep 2; done
+          exit 1
+      # Deliberately NOT pinned to a SHA: this job exists to test the public, floating ref.
+      - uses: Octavian-Mihai/web-security-scanner@v1
+        with:
+          url: http://localhost:3000
+          fail-on: high
+          sarif-file: consumer.sarif
+          upload-sarif: "false"

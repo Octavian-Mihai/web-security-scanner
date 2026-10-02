@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import re
+from typing import Any
 
 from . import __version__
 from .models import Finding, Rule, Severity
@@ -41,7 +42,7 @@ def _pascal(name: str) -> str:
     return "".join(w.capitalize() for w in re.split(r"[^A-Za-z0-9]+", name) if w)
 
 
-def _rule_descriptor(rule: Rule) -> dict:
+def _rule_descriptor(rule: Rule) -> dict[str, Any]:
     owasp_tag = "owasp-" + rule.owasp.split(" ")[0].lower().replace(":", "-")
     return {
         "id": rule.id,
@@ -70,7 +71,7 @@ def build_sarif(
     findings: list[Finding],
     errors: list[str] | None = None,
     anchor: str = "README.md",
-) -> dict:
+) -> dict[str, Any]:
     rule_ids = list(RULES)
     index = {rid: i for i, rid in enumerate(rule_ids)}
 
@@ -91,6 +92,7 @@ def build_sarif(
             "partialFingerprints": {"websecFinding/v1": f.fingerprint},
             "properties": {
                 "url": f.url,
+                "new": f.is_new,
                 "evidence": f.evidence,
                 "cwe": f.rule.cwe_id,
                 "owasp": f.rule.owasp,

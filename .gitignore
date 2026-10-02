@@ -7,3 +7,6 @@ build/
 dist/
 *.sarif
 results/
+.coverage
+coverage.xml
+htmlcov/

@@ -4,15 +4,28 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "websec-scanner"
-version = "0.1.0"
+version = "1.1.0"
 description = "Passive web security scanner that emits SARIF and gates CI builds"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
-dependencies = ["requests>=2.31", "certifi"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: Security",
+  "Intended Audience :: Developers",
+]
+keywords = ["security", "scanner", "sarif", "owasp", "github-actions"]
+dependencies = ["requests>=2.31", "certifi", "cryptography>=42"]
+
+[project.urls]
+Homepage = "https://github.com/Octavian-Mihai/web-security-scanner"
+Issues = "https://github.com/Octavian-Mihai/web-security-scanner/issues"
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5"]
+dev = [
+  "pytest>=8", "pytest-cov", "hypothesis", "ruff>=0.5", "mypy", "types-requests",
+  "bandit", "pip-audit", "build",
+]
 
 [project.scripts]
 websec = "websec.cli:main"
@@ -20,8 +33,20 @@ websec = "websec.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+websec = ["py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov=websec --cov-report=term-missing:skip-covered --cov-fail-under=90"
+
+[tool.coverage.run]
+branch = true
+
+[tool.mypy]
+strict = true
+files = ["src"]
+python_version = "3.11"
 
 [tool.ruff]
 line-length = 100

@@ -1,8 +1,9 @@
 name: Web Security Scan
 description: >
-  Passive web security scan (headers, cookies, TLS, CORS) that uploads SARIF to
-  GitHub code scanning and fails the build on findings at or above a severity.
-author: websec-scanner
+  Passive web security scan (headers, cookies, CORS, TLS, content, light exposure probing)
+  that uploads SARIF to GitHub code scanning and fails the build on findings at or above a
+  severity.
+author: Octavian-Mihai
 branding:
   icon: shield
   color: blue
@@ -15,10 +16,35 @@ inputs:
     description: Fail the job on findings at/above this severity (critical|high|medium|low|info|none).
     default: high
   ignore:
-    description: Comma-separated rule IDs to suppress (e.g. "WSS030,WSS008").
+    description: Comma-separated rule IDs to drop entirely (e.g. "WSS030,WSS008").
+    default: ""
+  config:
+    description: >
+      Suppression file (TOML) with per-rule, per-URL accepted risks that carry a reason and an
+      optional expiry. Defaults to .websec.toml in the workspace if present.
     default: ""
   checks:
-    description: Comma-separated check groups (headers,cookies,cors,tls,exposure). Default is all.
+    description: Comma-separated check groups (headers,cookies,content,cors,tls,exposure). Default is all.
+    default: ""
+  crawl-depth:
+    description: Follow same-origin links this many levels deep (0 = only the given URLs).
+    default: "0"
+  max-pages:
+    description: Maximum pages to scan when crawling.
+    default: "20"
+  workers:
+    description: Concurrent page fetches while crawling.
+    default: "4"
+  delay:
+    description: Minimum seconds between any two requests (global rate limit).
+    default: "0"
+  allow-host:
+    description: >
+      Extra host globs the scan may contact (e.g. "www.example.com"). By default only the hosts of
+      the given URLs are in scope, and a redirect elsewhere aborts the scan.
+    default: ""
+  compare-with:
+    description: Earlier SARIF report; findings are marked new and fixed ones counted against it.
     default: ""
   sarif-file:
     description: Where to write the SARIF report.
@@ -26,9 +52,20 @@ inputs:
   sarif-anchor:
     description: Repo file that results are attached to in the Security tab.
     default: README.md
+  html-file:
+    description: Optionally also write a standalone HTML report here.
+    default: ""
   upload-sarif:
     description: Upload SARIF to GitHub code scanning (needs `security-events - write`).
     default: "true"
+  pr-comment:
+    description: >
+      On pull_request events, post/update a summary comment (needs `pull-requests - write`;
+      silently skipped for fork PRs, whose token is read-only).
+    default: "false"
+  github-token:
+    description: Token used for the PR comment.
+    default: ${{ github.token }}
   insecure:
     description: Skip TLS verification when fetching pages (TLS findings are still reported).
     default: "false"
@@ -38,8 +75,11 @@ inputs:
 
 outputs:
   findings:
-    description: Total number of findings.
+    description: Total number of (unsuppressed) findings.
     value: ${{ steps.scan.outputs.findings }}
+  suppressed:
+    description: Number of findings suppressed by the baseline file.
+    value: ${{ steps.scan.outputs.suppressed }}
   highest-severity:
     description: Highest severity found, or "none".
     value: ${{ steps.scan.outputs.highest-severity }}
@@ -50,7 +90,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
       with:
         python-version: "3.12"
 
@@ -66,15 +106,29 @@ runs:
         WS_URLS: ${{ inputs.url }}
         WS_FAIL_ON: ${{ inputs.fail-on }}
         WS_IGNORE: ${{ inputs.ignore }}
+        WS_CONFIG: ${{ inputs.config }}
         WS_CHECKS: ${{ inputs.checks }}
+        WS_CRAWL_DEPTH: ${{ inputs.crawl-depth }}
+        WS_MAX_PAGES: ${{ inputs.max-pages }}
+        WS_WORKERS: ${{ inputs.workers }}
+        WS_DELAY: ${{ inputs.delay }}
+        WS_ALLOW_HOST: ${{ inputs.allow-host }}
+        WS_COMPARE: ${{ inputs.compare-with }}
         WS_SARIF: ${{ inputs.sarif-file }}
         WS_ANCHOR: ${{ inputs.sarif-anchor }}
+        WS_HTML: ${{ inputs.html-file }}
         WS_INSECURE: ${{ inputs.insecure }}
         WS_TIMEOUT: ${{ inputs.timeout }}
       run: |
-        args=(--sarif "$WS_SARIF" --sarif-anchor "$WS_ANCHOR" --fail-on "$WS_FAIL_ON" --timeout "$WS_TIMEOUT")
+        args=(--sarif "$WS_SARIF" --markdown "$WS_SARIF.md" --sarif-anchor "$WS_ANCHOR"
+              --fail-on "$WS_FAIL_ON" --timeout "$WS_TIMEOUT" --crawl-depth "$WS_CRAWL_DEPTH"
+              --max-pages "$WS_MAX_PAGES" --workers "$WS_WORKERS" --delay "$WS_DELAY")
         [ -n "$WS_IGNORE" ] && args+=(--ignore "$WS_IGNORE")
+        [ -n "$WS_CONFIG" ] && args+=(--config "$WS_CONFIG")
         [ -n "$WS_CHECKS" ] && args+=(--checks "$WS_CHECKS")
+        [ -n "$WS_ALLOW_HOST" ] && args+=(--allow-host "$WS_ALLOW_HOST")
+        [ -n "$WS_COMPARE" ] && args+=(--compare-with "$WS_COMPARE")
+        [ -n "$WS_HTML" ] && args+=(--html "$WS_HTML")
         [ "$WS_INSECURE" = "true" ] && args+=(--insecure)
         read -r -a urls <<< "$WS_URLS"
         websec scan "${urls[@]}" "${args[@]}"
@@ -82,7 +136,29 @@ runs:
     - name: Upload SARIF to code scanning
       # always(): findings must reach the Security tab even when the gate fails the build.
       if: always() && inputs.upload-sarif == 'true' && hashFiles(inputs.sarif-file) != ''
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
       with:
         sarif_file: ${{ inputs.sarif-file }}
         category: websec-scanner
+
+    - name: Comment on pull request
+      if: >
+        always() && inputs.pr-comment == 'true' && github.event_name == 'pull_request'
+        && hashFiles(format('{0}.md', inputs.sarif-file)) != ''
+      shell: bash
+      continue-on-error: true # fork PRs get a read-only token; never fail the build over a comment
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+        MD_FILE: ${{ inputs.sarif-file }}.md
+      run: |
+        marker='<!-- websec-scanner -->'
+        body="$marker"$'\n'"$(cat "$MD_FILE")"
+        id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+               --jq ".[] | select(.body | contains(\"$marker\")) | .id" | head -n1)
+        if [ -n "$id" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$id" -f body="$body" >/dev/null
+        else
+          gh api "repos/$REPO/issues/$PR/comments" -f body="$body" >/dev/null
+        fi

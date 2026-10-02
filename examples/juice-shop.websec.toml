@@ -1,0 +1,20 @@
+# Example baseline: Juice Shop is deliberately vulnerable, so these are accepted for the
+# demo. In a real project every entry needs an honest reason, and ideally an expiry.
+[[ignore]]
+rule = "WSS001"
+reason = "Demo target: CSP intentionally absent"
+expires = 2030-01-01
+
+[[ignore]]
+rule = "WSS010"
+reason = "Demo target: wildcard CORS is part of the training scenario"
+
+[[ignore]]
+rule = "WSS042"
+url = "*/ftp/"
+reason = "Demo target: /ftp is a deliberate challenge"
+
+[[ignore]]
+rule = "WSS044"
+url = "*/metrics"
+reason = "Demo target: Prometheus metrics exposed on purpose"

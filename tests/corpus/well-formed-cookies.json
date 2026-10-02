@@ -1,0 +1,24 @@
+{
+  "name": "well-formed-cookies",
+  "description": "__Host- and __Secure- cookies set correctly",
+  "https": true,
+  "routes": {
+    "*": {
+      "status": 200,
+      "headers": {
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "X-Content-Type-Options": "nosniff",
+        "Permissions-Policy": "geolocation=()",
+        "Content-Security-Policy": "default-src 'self'; frame-ancestors 'self'",
+        "Strict-Transport-Security": "max-age=31536000",
+        "Set-Cookie": "__Host-session=abc; Path=/; Secure; HttpOnly; SameSite=Strict"
+      },
+      "body": "<html></html>"
+    }
+  },
+  "groups": [
+    "headers",
+    "cookies"
+  ],
+  "expect": []
+}

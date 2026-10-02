@@ -13,17 +13,36 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
       - run: pip install -e ".[dev]"
       - run: ruff check .
-      - run: pytest -q
+      - run: mypy
+      - run: pytest -q  # includes the coverage gate configured in pyproject.toml
 
-  # End-to-end: run the published Action against a deliberately vulnerable app.
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check dist/*
+      - name: Wheel installs and runs in a clean environment
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install --quiet dist/*.whl
+          /tmp/clean/bin/websec --version
+          /tmp/clean/bin/websec rules | wc -l
+
+  # End-to-end: run the Action itself against a deliberately vulnerable app.
   juice-shop:
     runs-on: ubuntu-latest
     needs: test
@@ -35,7 +54,7 @@ jobs:
         image: bkimminich/juice-shop:latest
         ports: ["3000:3000"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Wait for Juice Shop
         run: |
@@ -45,34 +64,67 @@ jobs:
           done
           echo "Juice Shop did not start" && exit 1
 
-      # 1. Gate at "critical": Juice Shop has no critical findings, so this passes,
+      # 1. Gate at "high": Juice Shop's worst finding on localhost is medium, so this passes
       #    and SARIF is uploaded for the Security tab.
-      - name: Scan (gate = critical, expect pass)
-        id: pass
+      - name: Scan (gate = high, expect pass)
         uses: ./
         with:
           url: http://localhost:3000
-          fail-on: critical
+          fail-on: high
+          crawl-depth: "1"
           sarif-file: results/juice-shop.sarif
+          html-file: results/juice-shop.html
 
       - name: Findings match what Juice Shop is known to expose
         run: |
           pip install jsonschema
           python scripts/assert_findings.py results/juice-shop.sarif \
-            WSS030 WSS001 WSS010 WSS042 \
-            --forbid WSS006 WSS005
+            WSS038 WSS001 WSS010 WSS042 WSS044 \
+            --forbid WSS006 WSS005 WSS030
 
-      # 2. Gate at "high": plain HTTP is a high finding, so the Action must fail the build.
-      - name: Scan (gate = high, expect failure)
+      # 2. Gate at "medium": the same findings must now fail the build.
+      - name: Scan (gate = medium, expect failure)
         id: fail
         continue-on-error: true
         uses: ./
         with:
           url: http://localhost:3000
-          fail-on: high
+          fail-on: medium
           upload-sarif: "false"
           sarif-file: results/gate-check.sarif
 
       - name: Assert the gate actually failed the build
         if: steps.fail.outcome != 'failure'
-        run: echo "::error::fail-on=high should have failed on Juice Shop" && exit 1
+        run: echo "::error::fail-on=medium should have failed on Juice Shop" && exit 1
+
+      # 3. Baseline file: accepted risks are suppressed (with reasons) and the gate passes.
+      - name: Scan (gate = medium with baseline, expect pass)
+        id: baseline
+        uses: ./
+        with:
+          url: http://localhost:3000
+          fail-on: medium
+          config: examples/juice-shop.websec.toml
+          upload-sarif: "false"
+          sarif-file: results/baseline.sarif
+
+      - name: Baseline suppressed exactly the accepted findings
+        run: |
+          test "${{ steps.baseline.outputs.suppressed }}" = "4"
+          python scripts/assert_findings.py results/baseline.sarif --forbid WSS001 WSS010 WSS042 WSS044
+
+      # 4. Scope safety: a redirect off-scope must abort the scan with exit 2.
+      - name: Scanner refuses out-of-scope targets
+        run: |
+          python -m pip install --quiet .
+          python - <<'PY'
+          import http.server, threading, subprocess, sys
+          class H(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  self.send_response(302); self.send_header("Location", "http://localhost:3000/"); self.end_headers()
+              def log_message(self, *a): pass
+          srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+          threading.Thread(target=srv.serve_forever, daemon=True).start()
+          rc = subprocess.run(["websec", "scan", f"http://127.0.0.1:{srv.server_port}/"]).returncode
+          sys.exit(0 if rc == 2 else f"expected exit code 2, got {rc}")
+          PY
