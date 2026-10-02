@@ -1,0 +1,88 @@
+name: Web Security Scan
+description: >
+  Passive web security scan (headers, cookies, TLS, CORS) that uploads SARIF to
+  GitHub code scanning and fails the build on findings at or above a severity.
+author: websec-scanner
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  url:
+    description: Space- or newline-separated URL(s) to scan.
+    required: true
+  fail-on:
+    description: Fail the job on findings at/above this severity (critical|high|medium|low|info|none).
+    default: high
+  ignore:
+    description: Comma-separated rule IDs to suppress (e.g. "WSS030,WSS008").
+    default: ""
+  checks:
+    description: Comma-separated check groups (headers,cookies,cors,tls,exposure). Default is all.
+    default: ""
+  sarif-file:
+    description: Where to write the SARIF report.
+    default: websec-results.sarif
+  sarif-anchor:
+    description: Repo file that results are attached to in the Security tab.
+    default: README.md
+  upload-sarif:
+    description: Upload SARIF to GitHub code scanning (needs `security-events - write`).
+    default: "true"
+  insecure:
+    description: Skip TLS verification when fetching pages (TLS findings are still reported).
+    default: "false"
+  timeout:
+    description: Per-request timeout in seconds.
+    default: "10"
+
+outputs:
+  findings:
+    description: Total number of findings.
+    value: ${{ steps.scan.outputs.findings }}
+  highest-severity:
+    description: Highest severity found, or "none".
+    value: ${{ steps.scan.outputs.highest-severity }}
+  sarif-file:
+    description: Path to the SARIF report.
+    value: ${{ inputs.sarif-file }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install scanner
+      shell: bash
+      run: python -m pip install --quiet "${{ github.action_path }}"
+
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        # Inputs go through env, never interpolated into the script, to avoid injection.
+        WS_URLS: ${{ inputs.url }}
+        WS_FAIL_ON: ${{ inputs.fail-on }}
+        WS_IGNORE: ${{ inputs.ignore }}
+        WS_CHECKS: ${{ inputs.checks }}
+        WS_SARIF: ${{ inputs.sarif-file }}
+        WS_ANCHOR: ${{ inputs.sarif-anchor }}
+        WS_INSECURE: ${{ inputs.insecure }}
+        WS_TIMEOUT: ${{ inputs.timeout }}
+      run: |
+        args=(--sarif "$WS_SARIF" --sarif-anchor "$WS_ANCHOR" --fail-on "$WS_FAIL_ON" --timeout "$WS_TIMEOUT")
+        [ -n "$WS_IGNORE" ] && args+=(--ignore "$WS_IGNORE")
+        [ -n "$WS_CHECKS" ] && args+=(--checks "$WS_CHECKS")
+        [ "$WS_INSECURE" = "true" ] && args+=(--insecure)
+        read -r -a urls <<< "$WS_URLS"
+        websec scan "${urls[@]}" "${args[@]}"
+
+    - name: Upload SARIF to code scanning
+      # always(): findings must reach the Security tab even when the gate fails the build.
+      if: always() && inputs.upload-sarif == 'true' && hashFiles(inputs.sarif-file) != ''
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif-file }}
+        category: websec-scanner

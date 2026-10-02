@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: pytest -q
+
+  # End-to-end: run the published Action against a deliberately vulnerable app.
+  juice-shop:
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to the Security tab
+    services:
+      juice-shop:
+        image: bkimminich/juice-shop:latest
+        ports: ["3000:3000"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for Juice Shop
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/ >/dev/null && exit 0
+            sleep 2
+          done
+          echo "Juice Shop did not start" && exit 1
+
+      # 1. Gate at "critical": Juice Shop has no critical findings, so this passes,
+      #    and SARIF is uploaded for the Security tab.
+      - name: Scan (gate = critical, expect pass)
+        id: pass
+        uses: ./
+        with:
+          url: http://localhost:3000
+          fail-on: critical
+          sarif-file: results/juice-shop.sarif
+
+      - name: Findings match what Juice Shop is known to expose
+        run: |
+          pip install jsonschema
+          python scripts/assert_findings.py results/juice-shop.sarif \
+            WSS030 WSS001 WSS010 WSS042 \
+            --forbid WSS006 WSS005
+
+      # 2. Gate at "high": plain HTTP is a high finding, so the Action must fail the build.
+      - name: Scan (gate = high, expect failure)
+        id: fail
+        continue-on-error: true
+        uses: ./
+        with:
+          url: http://localhost:3000
+          fail-on: high
+          upload-sarif: "false"
+          sarif-file: results/gate-check.sarif
+
+      - name: Assert the gate actually failed the build
+        if: steps.fail.outcome != 'failure'
+        run: echo "::error::fail-on=high should have failed on Juice Shop" && exit 1

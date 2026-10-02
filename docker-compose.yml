@@ -1,0 +1,5 @@
+# Local test bench: `docker compose up -d juice-shop` then `websec scan http://localhost:3000`
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    ports: ["127.0.0.1:3000:3000"]
