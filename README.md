@@ -15,6 +15,11 @@ threshold.
 
 *Real output from scanning OWASP Juice Shop (`scripts/render_demo_svg.py` renders it; nothing is mocked).*
 
+The same findings in GitHub's **Security tab**, uploaded as SARIF by the Action in CI (alerts
+tagged `websec-scanner` are this tool's; the CodeQL ones come from scanning this repo's own code):
+
+![Findings in the GitHub Security tab](docs/security-tab.png)
+
 ## Use it as a GitHub Action
 
 ```yaml
