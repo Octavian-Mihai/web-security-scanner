@@ -49,6 +49,7 @@ jobs:
     permissions:
       contents: read
       security-events: write # upload SARIF to the Security tab
+      pull-requests: write # pr-comment: post the findings summary on PRs
     services:
       juice-shop:
         image: bkimminich/juice-shop:latest
@@ -72,6 +73,7 @@ jobs:
           url: http://localhost:3000
           fail-on: high
           crawl-depth: "1"
+          pr-comment: "true"
           sarif-file: results/juice-shop.sarif
           html-file: results/juice-shop.html
 
