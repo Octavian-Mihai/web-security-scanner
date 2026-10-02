@@ -24,7 +24,7 @@ permissions:
 
 steps:
   - uses: actions/checkout@v4
-  - uses: Octavian-Mihai/web-security-scanner@main
+  - uses: Octavian-Mihai/web-security-scanner@v1
     with:
       url: https://staging.example.com
       fail-on: high          # critical | high | medium | low | info | none
