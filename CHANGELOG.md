@@ -3,6 +3,13 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/). The release workflow publishes the section matching the tag.
 
+## [1.1.1] - 2026-10-02
+
+### Changed
+- The Action now uses `actions/setup-python` v7 (it was v6), picking up the Node 24 runtime;
+  the repository's workflows are updated to match (checkout v7, upload-artifact v7,
+  download-artifact v8). All pinned to commit SHAs. No scanner behaviour changes.
+
 ## [1.1.0] - 2026-10-02
 
 ### Added
