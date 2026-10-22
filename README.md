@@ -107,6 +107,49 @@ websec rules          # every rule with severity, CWE, OWASP
 Severity is fixed per rule in [`rules.py`](src/websec/rules.py), the single source of truth for
 the CWE/OWASP mapping, SARIF rule metadata and every report.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    CLI["cli.py / action.yml<br/>args · exit codes 0 / 1 / 2"] --> Sc["scanner.py<br/>Scanner · scope · redirects · crawl · robots.txt"]
+    Sc -->|"fetched pages"| HI["htmlinfo.py<br/>parse_html → PageInfo"]
+    Sc --> Chk["checks/<br/>headers · cookies · content<br/>cors · tls · exposure"]
+    HI --> Chk
+    Chk -->|"Finding"| Rules["rules.py<br/>rule catalog: severity · CWE · OWASP"]
+    Rules --> Base["baseline.py<br/>.websec.toml suppressions<br/>reason · expiry"]
+    Base --> Rep["report.py<br/>console · markdown · JSON"]
+    Base --> Sarif["sarif.py<br/>GitHub Security tab"]
+    Rep --> Out([stdout / files])
+    Sarif --> Out
+    Target(["Target site"]) <--> Sc
+```
+
+| Path | Purpose |
+|---|---|
+| `src/websec/cli.py`, `__main__.py` | Command line, options and exit codes |
+| `src/websec/scanner.py` | HTTP session, scope enforcement, manual redirect following, same-origin crawl, thread pool |
+| `src/websec/checks/` | One module per group: `headers`, `cookies`, `content`, `cors`, `tls`, `exposure` |
+| `src/websec/rules.py` | Single source of truth for the 33 rules (id, severity, CWE, OWASP, remediation) |
+| `src/websec/models.py` | `Finding` and related types |
+| `src/websec/htmlinfo.py` | HTML parsing for scripts, styles and mixed content |
+| `src/websec/baseline.py` | `.websec.toml` suppressions that need a reason and can expire |
+| `src/websec/report.py`, `sarif.py` | Console, markdown, JSON and SARIF output |
+| `action.yml`, `Dockerfile`, `docker-compose.yml` | GitHub Action, container image and the Juice Shop test setup |
+| `tests/` | Unit tests plus a corpus of well-configured sites that must scan clean |
+| `examples/`, `scripts/` | Example workflows and helper scripts |
+| `docs/` | `design.md`, demo SVG and Security tab screenshot |
+
+## Design patterns
+
+- **Catalog as the source of truth.** Rules are declared once in `rules.py`; reports, SARIF metadata and `websec rules` are all
+  derived from it, so the CWE/OWASP mapping cannot drift.
+- **One module per check group, one shared `Finding` type.** Adding a rule means a catalog entry and a check function.
+- **Scope guard before I/O.** Redirects are followed manually so an out-of-scope hop is refused before a request is made.
+- **Passive by design.** No payloads are sent; exposure checks validate content to avoid false positives on SPAs.
+- **Baseline with expiry.** Suppressions require a reason, can expire, and stale entries are reported.
+- **Distinct failure exit codes.** 1 means the gate tripped, 2 means the scan was untrustworthy, so an outage never passes as clean.
+- **Concurrent fetching.** A bounded thread pool crawls and probes pages in parallel.
+
 ## Accepting risk without turning the gate off
 
 ```toml
